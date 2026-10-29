@@ -4,24 +4,70 @@ let tasks = JSON.parse(localStorage.getItem('vnt-tasks') || '[]');
 const save = () => { localStorage.setItem('vnt-tasks', JSON.stringify(tasks)); render(); };
 const status = s => $('status').textContent = s;
 
+let lastDeleted = null, undoTimer = null;
+function removeTask(t) {
+  const idx = tasks.indexOf(t); if (idx < 0) return;
+  tasks.splice(idx, 1); lastDeleted = { t, idx }; save();
+  $('undomsg').textContent = `Deleted “${t.title}”.`; $('undo').hidden = false;
+  clearTimeout(undoTimer); undoTimer = setTimeout(() => { $('undo').hidden = true; lastDeleted = null; }, 8000);
+  const items = $('tasks').querySelectorAll('li.task'); (items[Math.min(idx, items.length - 1)] || $('transcript')).focus();
+}
+function undoDelete() {
+  if (!lastDeleted) return; tasks.splice(lastDeleted.idx, 0, lastDeleted.t); const { idx } = lastDeleted;
+  lastDeleted = null; $('undo').hidden = true; save(); status('Task restored.');
+  const li = $('tasks').querySelectorAll('li.task')[idx]; li && li.focus();
+}
+
 function render() {
   $('tasks').innerHTML = ''; $('empty').hidden = tasks.length > 0;
-  tasks.forEach(t => {
-    const li = document.createElement('li'); if (t.done) li.className = 'done';
-    li.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span class="t" contenteditable></span>
+  tasks.forEach((t, i) => {
+    const li = document.createElement('li'); li.className = 'task' + (t.done ? ' done' : ''); li.tabIndex = -1;
+    li.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span class="t" contenteditable role="textbox" aria-label="Task title"></span>
       ${t.priority === 'high' ? '<span class="chip high">high</span>' : ''}
       ${t.time ? `<span class="chip time">🕒 ${t.time}</span>` : ''}
       ${t.recurrence ? `<span class="chip rec" title="Repeats weekly">↻ ${(t.recurrence.byday || []).join('/') || 'weekly'}</span>` : ''}
       ${t.tags.map(g => `<span class="chip">#${g}</span>`).join('')}
-      <input type="date" value="${t.due || ''}"><button class="ghost" title="Delete">✕</button>`;
-    li.querySelector('.t').textContent = t.title;
-    li.querySelector('.t').onblur = e => { t.title = e.target.textContent.trim(); save(); };
-    li.querySelector('[type=checkbox]').onchange = e => { t.done = e.target.checked; save(); };
+      <input type="date" value="${t.due || ''}"><button class="ghost del" title="Delete">✕</button>`;
+    const title = li.querySelector('.t'); title.textContent = t.title;
+    li.querySelector('[type=checkbox]').setAttribute('aria-label', `Done: ${t.title}`);
+    li.querySelector('[type=date]').setAttribute('aria-label', `Due date for ${t.title}`);
+    li.querySelector('.del').setAttribute('aria-label', `Delete ${t.title}`);
+    title.onblur = e => { const v = e.target.textContent.trim(); if (v && v !== t.title) { t.title = v; save(); } else e.target.textContent = t.title; };
+    title.onkeydown = e => {
+      if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); li.focus(); }
+      if (e.key === 'Escape') { e.target.textContent = t.title; e.target.blur(); li.focus(); }
+      e.stopPropagation();
+    };
+    li.querySelector('[type=checkbox]').onchange = e => { t.done = e.target.checked; save(); focusTask(i); status(`${t.title}: ${t.done ? 'done' : 'not done'}.`); };
     li.querySelector('[type=date]').onchange = e => { t.due = e.target.value || null; save(); };
-    li.querySelector('button').onclick = () => { tasks = tasks.filter(x => x !== t); save(); };
+    li.querySelector('.del').onclick = () => removeTask(t);
+    li.onkeydown = e => {
+      if (e.target !== li) return;
+      const items = [...$('tasks').querySelectorAll('li.task')];
+      if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); (items[i + 1] || li).focus(); }
+      else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); (items[i - 1] || li).focus(); }
+      else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+      else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+      else if (e.key === ' ' || e.key === 'x') { e.preventDefault(); t.done = !t.done; save(); focusTask(i); status(`${t.title}: ${t.done ? 'done' : 'not done'}.`); }
+      else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); title.focus(); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeTask(t); }
+    };
     $('tasks').appendChild(li);
   });
 }
+const focusTask = i => { const li = $('tasks').querySelectorAll('li.task')[i]; li && li.focus(); };
+$('undobtn').onclick = undoDelete;
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && lastDeleted && !e.target.closest('textarea,[contenteditable]')) { e.preventDefault(); undoDelete(); }
+});
+
+// Theme: follows the OS unless toggled; choice persisted.
+const applyTheme = th => { if (th) document.documentElement.dataset.theme = th; else delete document.documentElement.dataset.theme; };
+applyTheme(localStorage.getItem('vnt-theme'));
+$('theme').onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const next = cur === 'dark' ? 'light' : 'dark'; applyTheme(next); localStorage.setItem('vnt-theme', next); status(`${next[0].toUpperCase() + next.slice(1)} mode.`);
+};
 
 // Browser speech recognition (Chrome/Edge/Safari). Falls back to paste/demo mode.
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -33,7 +79,7 @@ $('rec').onclick = async () => {
   const base = $('transcript').value ? $('transcript').value + ' ' : '';
   rec.onresult = e => { $('transcript').value = base + [...e.results].map(r => r[0].transcript).join(' '); };
   rec.onerror = e => status('Mic error: ' + e.error);
-  rec.onend = () => { rec = null; $('rec').classList.remove('on'); $('rec').textContent = '● Record'; status('Stopped.'); };
+  rec.onend = () => { rec = null; $('rec').classList.remove('on'); $('rec').setAttribute('aria-pressed','false'); $('rec').textContent = '● Record'; status('Stopped.'); };
   try { // also keep the audio so it can be replayed
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     recorder = new MediaRecorder(stream); chunks = [];
@@ -41,7 +87,7 @@ $('rec').onclick = async () => {
     recorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); $('player').src = URL.createObjectURL(new Blob(chunks)); $('player').hidden = false; };
     recorder.start();
   } catch (_) {}
-  rec.start(); $('rec').classList.add('on'); $('rec').textContent = '■ Stop'; status('Listening…');
+  rec.start(); $('rec').classList.add('on'); $('rec').setAttribute('aria-pressed','true'); $('rec').textContent = '■ Stop'; status('Listening…');
 };
 
 // Uploaded audio: play it; optionally transcribe offline with Whisper (lazy-loaded, see whisper.js).
@@ -55,7 +101,7 @@ $('whisper').onclick = async () => {
   if (!upload) return;
   const btn = $('whisper'), box = $('wbox'), prog = $('wprog'), txt = $('wtext');
   btn.disabled = true; box.hidden = false; prog.removeAttribute('value');
-  const onProgress = p => { txt.textContent = p.text; if (p.pct != null) prog.value = p.pct; else prog.removeAttribute('value'); };
+  const onProgress = p => { txt.textContent = p.text; if (p.stage !== "model") status(p.text); if (p.pct != null) prog.value = p.pct; else prog.removeAttribute('value'); };
   try {
     const mod = await import('./whisper.js');
     const text = await mod.transcribe(upload, onProgress);
@@ -74,7 +120,16 @@ $('parse').onclick = () => {
   tasks = tasks.concat(found.map((t, i) => ({ ...t, id: start + i + 1 }))); save();
   status(`${found.length} task(s) extracted.`);
 };
-$('clear').onclick = () => { tasks = []; save(); };
+$('clear').onclick = () => { if (tasks.length && !confirm(`Clear all ${tasks.length} task(s)?`)) return; tasks = []; save(); status('Checklist cleared.'); };
+// Share: link that pre-fills the transcript via ?t= (stays client-side; nothing is uploaded).
+const shareURL = text => { const u = new URL(location.href); u.search = ''; u.hash = ''; u.searchParams.set('t', text); return u.toString(); };
+$('share').onclick = () => {
+  const text = $('transcript').value.trim(); if (!text) { status('Nothing to share — add a transcript first.'); return; }
+  const url = shareURL(text);
+  if (url.length > 8000) { status('Transcript too long to share as a link (~8 KB max).'); return; }
+  const done = () => status('Share link copied.');
+  (navigator.share && matchMedia('(pointer: coarse)').matches ? navigator.share({ title: 'Voice Note Tasks', url }) : navigator.clipboard.writeText(url)).then(done, () => { history.replaceState(null, '', url); status('Link is in the address bar — copy it from there.'); });
+};
 $('copy').onclick = () => {
   const md = tasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.title}${t.due ? ` (due ${t.due}${t.time ? ' ' + t.time : ''})` : ''}${t.recurrence ? ' (weekly)' : ''}${t.tags.map(g => ' #' + g).join('')}`).join('\n');
   navigator.clipboard.writeText(md).then(() => status('Copied Markdown.'));
@@ -89,5 +144,7 @@ $('json').onclick = () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(tasks, null, 2)], { type: 'application/json' }));
   a.download = 'tasks.json'; a.click();
 };
-if (new URLSearchParams(location.search).has('demo')) { $('demo').click(); if (!tasks.length) $('parse').click(); }
+const qs = new URLSearchParams(location.search);
+if (qs.get('t')) { $('transcript').value = qs.get('t').slice(0, 5000); status('Transcript loaded from link — review it, then Extract tasks.'); if (qs.has('auto')) $('parse').click(); }
+else if (qs.has('demo')) { $('demo').click(); if (!tasks.length) $('parse').click(); }
 render();

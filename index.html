@@ -1,23 +1,30 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Voice Note Tasks</title><link rel="stylesheet" href="style.css"></head><body>
-<header><h1>🎙️ Voice Note Tasks</h1><p>Speak or paste a voice note → get a checklist with due dates and tags. Runs entirely in your browser.</p></header>
+<header><button id="theme" class="ghost" aria-label="Toggle dark mode" style="float:right">🌓</button><h1>🎙️ Voice Note Tasks</h1><p>Speak or paste a voice note → get a checklist with due dates and tags. Runs entirely in your browser.</p></header>
 <main>
 <section class="card">
   <div class="row">
-    <button id="rec">● Record</button>
+    <button id="rec" aria-pressed="false">● Record</button>
     <label class="btn">Upload audio<input id="file" type="file" accept="audio/*" hidden></label>
     <button id="whisper" class="ghost" hidden title="Optional: downloads ~40 MB model once, then runs offline in your browser">✨ Transcribe with Whisper</button>
     <button id="demo" class="ghost">Load demo transcript</button>
-    <span id="status"></span>
+    <span id="status" role="status" aria-live="polite" aria-atomic="true"></span>
   </div>
   <audio id="player" controls hidden></audio>
-  <div id="wbox" hidden><progress id="wprog" max="100"></progress> <span id="wtext" class="muted"></span></div>
-  <textarea id="transcript" rows="6" placeholder="Transcript appears here — or paste one (demo mode, no mic or API key needed)."></textarea>
+  <div id="wbox" hidden aria-live="polite"><progress id="wprog" max="100"></progress> <span id="wtext" class="muted"></span></div>
+  <label for="transcript" class="sr-only">Transcript</label><textarea id="transcript" rows="6" placeholder="Transcript appears here — or paste one (demo mode, no mic or API key needed)."></textarea>
   <button id="parse" class="primary">Extract tasks →</button>
 </section>
 <section class="card"><div class="row"><h2>Checklist</h2><span class="spacer"></span>
-  <button id="copy" class="ghost">Copy Markdown</button><button id="json" class="ghost">Download JSON</button><button id="ics" class="ghost" title="Tasks with a due date become calendar events">Export .ics</button><button id="clear" class="ghost">Clear</button></div>
-  <ul id="tasks"></ul><p id="empty" class="muted">No tasks yet.</p></section>
+  <button id="copy" class="ghost">Copy Markdown</button><button id="json" class="ghost">Download JSON</button><button id="ics" class="ghost" title="Tasks with a due date become calendar events">Export .ics</button><button id="share" class="ghost" title="Copy a link that pre-fills this transcript">Share link</button><button id="clear" class="ghost">Clear</button></div>
+  <div id="undo" class="undo" hidden role="alert"><span id="undomsg"></span> <button id="undobtn" class="ghost">Undo</button></div>
+  <ul id="tasks" aria-label="Tasks" aria-describedby="kbdhelp"></ul>
+  <p id="kbdhelp" class="sr-only">Use Up and Down arrows to move between tasks, Space to toggle done, Enter to edit the title, Delete to remove.</p>
+  <div id="empty" class="muted empty"><p><strong>No tasks yet.</strong> Tips:</p><ul>
+    <li>Press <b>● Record</b> and talk naturally: “call the dentist tomorrow, buy milk, pay rent on Nov 1st #finance”.</li>
+    <li>Say times and repeats: “at 3pm”, “every Tuesday”.</li>
+    <li>Words like “urgent” mark high priority; <code>#tags</code> are kept.</li>
+    <li>No mic? Click <b>Load demo transcript</b> or open <code>?t=your+text</code>.</li></ul></div></section>
 </main>
 <footer>Built by <a href="https://trevorheshka.com">Trevor Heshka</a> · MIT</footer>
 <script src="parser.js"></script><script src="ics.js"></script><script src="app.js"></script></body></html>
