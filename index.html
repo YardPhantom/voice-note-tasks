@@ -6,16 +6,18 @@
   <div class="row">
     <button id="rec">● Record</button>
     <label class="btn">Upload audio<input id="file" type="file" accept="audio/*" hidden></label>
+    <button id="whisper" class="ghost" hidden title="Optional: downloads ~40 MB model once, then runs offline in your browser">✨ Transcribe with Whisper</button>
     <button id="demo" class="ghost">Load demo transcript</button>
     <span id="status"></span>
   </div>
   <audio id="player" controls hidden></audio>
+  <div id="wbox" hidden><progress id="wprog" max="100"></progress> <span id="wtext" class="muted"></span></div>
   <textarea id="transcript" rows="6" placeholder="Transcript appears here — or paste one (demo mode, no mic or API key needed)."></textarea>
   <button id="parse" class="primary">Extract tasks →</button>
 </section>
 <section class="card"><div class="row"><h2>Checklist</h2><span class="spacer"></span>
-  <button id="copy" class="ghost">Copy Markdown</button><button id="json" class="ghost">Download JSON</button><button id="clear" class="ghost">Clear</button></div>
+  <button id="copy" class="ghost">Copy Markdown</button><button id="json" class="ghost">Download JSON</button><button id="ics" class="ghost" title="Tasks with a due date become calendar events">Export .ics</button><button id="clear" class="ghost">Clear</button></div>
   <ul id="tasks"></ul><p id="empty" class="muted">No tasks yet.</p></section>
 </main>
 <footer>Built by <a href="https://trevorheshka.com">Trevor Heshka</a> · MIT</footer>
-<script src="parser.js"></script><script src="app.js"></script></body></html>
+<script src="parser.js"></script><script src="ics.js"></script><script src="app.js"></script></body></html>
