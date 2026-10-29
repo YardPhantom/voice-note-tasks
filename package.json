@@ -1,0 +1,2 @@
+{ "name": "voice-note-tasks", "version": "1.0.0", "license": "MIT", "homepage": "https://trevorheshka.com",
+  "author": "Trevor Heshka", "scripts": { "start": "npx --yes serve -l 5173 .", "test": "node test.js" } }
